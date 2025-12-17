@@ -2604,7 +2604,8 @@ static int nbft_filter(const struct dirent *dent)
 	return !fnmatch(NBFT_SYSFS_FILENAME, dent->d_name, FNM_PATHNAME);
 }
 
-int nvmf_nbft_read_files(char *path, struct nbft_file_entry **head)
+int nvmf_nbft_read_files(struct nvme_global_ctx *ctx, char *path,
+		struct nbft_file_entry **head)
 {
 	struct nbft_file_entry *entry = NULL;
 	struct nbft_info *nbft;
@@ -2620,7 +2621,7 @@ int nvmf_nbft_read_files(char *path, struct nbft_file_entry **head)
 		snprintf(filename, sizeof(filename), "%s/%s", path,
 			dent[i]->d_name);
 
-		ret = nvme_nbft_read(&nbft, filename);
+		ret = nvme_nbft_read(ctx, &nbft, filename);
 		if (!ret) {
 			struct nbft_file_entry *new;
 
@@ -2642,12 +2643,12 @@ int nvmf_nbft_read_files(char *path, struct nbft_file_entry **head)
 	return 0;
 }
 
-void nvmf_nbft_free(struct nbft_file_entry *head)
+void nvmf_nbft_free(struct nvme_global_ctx *ctx, struct nbft_file_entry *head)
 {
 	while (head) {
 		struct nbft_file_entry *next = head->next;
 
-		nvme_nbft_free(head->nbft);
+		nvme_nbft_free(ctx, head->nbft);
 		free(head);
 
 		head = next;
@@ -2872,7 +2873,7 @@ int nvmf_discovery_nbft(struct nvme_global_ctx *ctx,
 		/* TODO: print discovery-type info from NBFT tables */
 		return 0;
 
-	ret = nvmf_nbft_read_files(nbft_path, &entry);
+	ret = nvmf_nbft_read_files(ctx, nbft_path, &entry);
 	if (ret) {
 		if (ret != -ENOENT)
 			nvme_msg(ctx, LOG_ERR,
@@ -3065,7 +3066,7 @@ int nvmf_discovery_nbft(struct nvme_global_ctx *ctx,
 		}
 	}
 out_free:
-	nvmf_nbft_free(entry);
+	nvmf_nbft_free(ctx, entry);
 	return ret;
 }
 
