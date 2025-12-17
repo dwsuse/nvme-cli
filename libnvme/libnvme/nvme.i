@@ -556,8 +556,11 @@ struct nvme_ns {
 		  const char *hostkey = NULL,
 		  const char *hostsymname = NULL) {
 		nvme_host_t h;
-		if (hostnqn)
+		if (hostnqn) {
 			h = nvme_lookup_host(ctx, hostnqn, hostid);
+			if (!h && nvme_create_host(ctx, hostnqn, hostid, &h))
+				return NULL;
+		}
 		if (nvme_default_host(ctx, &h))
 			return NULL;
 		if (hostsymname)

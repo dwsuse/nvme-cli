@@ -176,6 +176,10 @@ static void json_parse_host(struct nvme_global_ctx *ctx, struct json_object *hos
 	if (attr_obj)
 		hostid = json_object_get_string(attr_obj);
 	h = nvme_lookup_host(ctx, hostnqn, hostid);
+	if (!h) {
+		if (nvme_create_host(ctx, hostnqn, hostid, &h))
+			return;
+	}
 	attr_obj = json_object_object_get(host_obj, "dhchap_key");
 	if (attr_obj)
 		nvme_host_set_dhchap_key(h, json_object_get_string(attr_obj));

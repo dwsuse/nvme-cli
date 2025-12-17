@@ -1001,10 +1001,9 @@ int fabrics_config(const char *desc, int argc, char **argv)
 		if (!hostid && hnqn)
 			hostid = hid = nvmf_hostid_from_file();
 		h = nvme_lookup_host(ctx, hostnqn, hostid);
-		if (!h) {
-			fprintf(stderr, "Failed to lookup host '%s'\n",
-				hostnqn);
-			return -ENODEV;
+		if (!h && nvme_create_host(ctx, hostnqn, hostid, &h)) {
+			fprintf(stderr, "Failed to create host\n");
+			return ret;
 		}
 		if (hostkey)
 			nvme_host_set_dhchap_key(h, hostkey);
