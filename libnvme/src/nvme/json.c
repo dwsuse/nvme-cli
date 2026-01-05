@@ -105,10 +105,18 @@ static void json_parse_port(nvme_subsystem_t s, struct json_object *port_obj)
 	attr_obj = json_object_object_get(port_obj, "trsvcid");
 	if (attr_obj)
 		trsvcid = json_object_get_string(attr_obj);
-	c = nvme_lookup_ctrl(s, transport, traddr, host_traddr,
-			     host_iface, trsvcid, NULL);
-	if (!c)
-		return;
+	c = nvme_lookup_ctrl(s, transport, traddr, trsvcid,
+		host_traddr, host_iface);
+	if (!c) {
+		if (nvme_create_ctrl(s->h->ctx,
+				nvme_subsystem_get_nqn(s), transport,
+				traddr, trsvcid, host_traddr, host_iface, &c))
+			return;
+		if (nvme_subsystem_add_ctrl(s, c)) {
+			nvme_free_ctrl(c);
+			return;
+		}
+	}
 	json_update_attributes(c, port_obj);
 	attr_obj = json_object_object_get(port_obj, "dhchap_key");
 	if (attr_obj)

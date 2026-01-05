@@ -239,6 +239,21 @@ int nvme_create_subsystem(struct nvme_host *h,
 		struct nvme_subsystem **subsys);
 
 /**
+ * nvme_subsystem_add_ctrl() - Add a unitialized ctrl to the subsystem
+ * @s:		&nvme_subsystem object
+ * @c:		&nvme_ctrl object to be added to &s
+ *
+ * When creating a new nvme_ctrl object it is not added to the subsystem
+ * at this point. This happens when either nvme_init_ctrl() is called
+ * explicitly or via nvme_add_ctrl().
+ *
+ * This function is useful to add a ctrl to the subsystem when importing
+ * the configuration into the tree. The tree contains the configuration
+ * and all discovered/added controllers at the same time.
+ */
+int nvme_subsystem_add_ctrl(struct nvme_subsystem *s, struct nvme_ctrl *c);
+
+/**
  * nvme_lookup_subsystem() - Lookup nvme_subsystem_t object
  * @h:		&nvme_host_t object
  * @name:	Name of the subsystem (may be NULL)
@@ -342,48 +357,19 @@ nvme_path_t nvme_namespace_next_path(nvme_ns_t ns, nvme_path_t p);
  * @s:			&nvme_subsystem_t object
  * @transport:		Transport name
  * @traddr:		Transport address
- * @host_traddr:	Host transport address
- * @host_iface:		Host interface name
  * @trsvcid:		Transport service identifier
- * @p:			Previous controller instance
- *
- * Lookup a controller in @s based on @transport, @traddr,
- * @host_traddr, @host_iface, and @trsvcid. @transport must be specified,
- * other fields may be required depending on the transport. A new
- * object is created if none is found. If @p is specified the lookup
- * will start at @p instead of the first controller.
- *
- * Return: Controller instance
- */
-nvme_ctrl_t nvme_lookup_ctrl(nvme_subsystem_t s, const char *transport,
-			     const char *traddr, const char *host_traddr,
-			     const char *host_iface, const char *trsvcid,
-			     nvme_ctrl_t p);
-
-/**
- * nvme_ctrl_find() - Locate an existing controller
- * @s:			&nvme_subsystem_t object
- * @transport:		Transport name
- * @traddr:		Transport address
- * @trsvcid:		Transport service identifier
- * @subsysnqn:		Subsystem NQN
  * @host_traddr:	Host transport address
  * @host_iface:		Host interface name
  *
  * Lookup a controller in @s based on @transport, @traddr, @trsvcid,
- * @subsysnqn, @host_traddr, and @host_iface. @transport must be specified,
- * other fields may be required depending on the transport. Parameters set
- * to NULL will be ignored.
+ * @host_traddr and @host_iface. @transport must be specified,
+ * other fields may be required depending on the transport.
  *
- * Unlike nvme_lookup_ctrl(), this function does not create a new object if
- * an existing controller cannot be found.
- *
- * Return: Controller instance on success, NULL otherwise.
+ * Return: Controller instance if found
  */
-nvme_ctrl_t nvme_ctrl_find(nvme_subsystem_t s, const char *transport,
-			   const char *traddr, const char *trsvcid,
-			   const char *subsysnqn, const char *host_traddr,
-			   const char *host_iface);
+nvme_ctrl_t nvme_lookup_ctrl(nvme_subsystem_t s, const char *transport,
+			     const char *traddr, const char *trsvcid,
+			     const char *host_traddr, const char *host_iface);
 
 /**
  * nvme_ctrl_config_match() - Check if ctrl @c matches config params
@@ -412,9 +398,9 @@ bool nvme_ctrl_config_match(struct nvme_ctrl *c, const char *transport,
  * @subsysnqn:		Subsystem NQN
  * @transport:		Transport type
  * @traddr:		Transport address
+ * @trsvcid:		Transport service ID
  * @host_traddr:	Host transport address
  * @host_iface:		Host interface name
- * @trsvcid:		Transport service ID
  * @c:			@nvme_ctrl_t object to return
  *
  * Creates an unconnected controller to be used for nvme_add_ctrl().
@@ -423,8 +409,8 @@ bool nvme_ctrl_config_match(struct nvme_ctrl *c, const char *transport,
  */
 int nvme_create_ctrl(struct nvme_global_ctx *ctx,
 		     const char *subsysnqn, const char *transport,
-		     const char *traddr, const char *host_traddr,
-		     const char *host_iface, const char *trsvcid,
+		     const char *traddr, const char *trsvcid,
+		     const char *host_traddr, const char *host_iface,
 		     nvme_ctrl_t *c);
 
 

@@ -1014,11 +1014,19 @@ int fabrics_config(const char *desc, int argc, char **argv)
 				subsysnqn);
 			return -ENODEV;
 		}
-		c = nvme_lookup_ctrl(s, transport, traddr,
-				     host_traddr, host_iface,
-				     trsvcid, NULL);
+		c = nvme_lookup_ctrl(s, transport, traddr, trsvcid,
+				     host_traddr, host_iface);
 		if (!c) {
-			fprintf(stderr, "Failed to lookup controller\n");
+			if (nvme_create_ctrl(ctx, nvme_subsystem_get_nqn(s),
+					transport, traddr, trsvcid, host_traddr,
+					host_iface, &c)) {
+				fprintf(stderr,
+					"Failed to create controller\n");
+				return -ENODEV;
+			}
+		}
+		if (nvme_subsystem_add_ctrl(s, c)) {
+			fprintf(stderr, "Failed to add controller\n");
 			return -ENODEV;
 		}
 		if (ctrlkey)

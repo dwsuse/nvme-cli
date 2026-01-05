@@ -973,10 +973,8 @@ static const char *lookup_context(struct nvme_global_ctx *ctx, nvme_ctrl_t c)
 
 	nvme_for_each_host(ctx, h) {
 		nvme_for_each_subsystem(h, s) {
-			if (__nvme_lookup_ctrl(s, nvme_ctrl_get_transport(c),
+			if (nvme_lookup_ctrl(s, nvme_ctrl_get_transport(c),
 					       nvme_ctrl_get_traddr(c),
-					       NULL,
-					       NULL,
 					       nvme_ctrl_get_trsvcid(c),
 					       NULL,
 					       NULL))
@@ -1003,13 +1001,11 @@ int nvmf_add_ctrl(nvme_host_t h, nvme_ctrl_t c,
 	if (s) {
 		nvme_ctrl_t fc;
 
-		fc = __nvme_lookup_ctrl(s, nvme_ctrl_get_transport(c),
+		fc = nvme_lookup_ctrl(s, nvme_ctrl_get_transport(c),
 					nvme_ctrl_get_traddr(c),
-					nvme_ctrl_get_host_traddr(c),
-					nvme_ctrl_get_host_iface(c),
 					nvme_ctrl_get_trsvcid(c),
-					NULL,
-					NULL);
+					nvme_ctrl_get_host_traddr(c),
+					nvme_ctrl_get_host_iface(c));
 		if (fc) {
 			const char *key;
 
@@ -1151,8 +1147,8 @@ static int nvmf_connect_disc_entry(nvme_host_t h,
 		 "(transport: %s, traddr: %s, trsvcid %s)\n",
 		 transport, traddr, trsvcid);
 
-	ret = nvme_create_ctrl(h->ctx, e->subnqn, transport, traddr,
-			       host_traddr, host_iface, trsvcid, &c);
+	ret = nvme_create_ctrl(h->ctx, e->subnqn, transport,
+		traddr, trsvcid, host_traddr, host_iface, &c);
 	if (ret) {
 		nvme_msg(h->ctx, LOG_DEBUG, "skipping discovery entry, "
 			 "failed to allocate %s controller with traddr %s\n",
@@ -2032,11 +2028,10 @@ static nvme_ctrl_t lookup_ctrl(nvme_host_t h, struct fabric_args *trcfg)
 	nvme_ctrl_t c;
 
 	nvme_for_each_subsystem(h, s) {
-		c = nvme_ctrl_find(s,
+		c = nvme_lookup_ctrl(s,
 				   trcfg->transport,
 				   trcfg->traddr,
 				   trcfg->trsvcid,
-				   trcfg->subsysnqn,
 				   trcfg->host_traddr,
 				   trcfg->host_iface);
 		if (c)
@@ -2271,9 +2266,9 @@ static int __create_discovery_ctrl(struct nvme_global_ctx *ctx,
 	nvme_ctrl_t c;
 	int tmo, ret;
 
-	ret = nvme_create_ctrl(ctx, trcfg->subsysnqn, trcfg->transport,
-			     trcfg->traddr, trcfg->host_traddr,
-			     trcfg->host_iface, trcfg->trsvcid, &c);
+	ret = nvme_create_ctrl(ctx, trcfg->subsysnqn,
+		trcfg->transport, trcfg->traddr, trcfg->trsvcid,
+		trcfg->host_traddr, trcfg->host_iface, &c);
 	if (ret)
 		return ret;
 
@@ -2703,9 +2698,9 @@ static int nbft_connect(struct nvme_global_ctx *ctx,
 	if (c && nvme_ctrl_get_name(c))
 		return 0;
 
-	ret = nvme_create_ctrl(ctx, trcfg->subsysnqn, trcfg->transport,
-			     trcfg->traddr, trcfg->host_traddr,
-			     trcfg->host_iface, trcfg->trsvcid, &c);
+	ret = nvme_create_ctrl(ctx, trcfg->subsysnqn,
+		trcfg->transport, trcfg->traddr, trcfg->trsvcid,
+		trcfg->host_traddr, trcfg->host_iface, &c);
 	if (ret)
 		return ret;
 
@@ -3081,9 +3076,9 @@ static int __create_discover_ctrl(struct nvme_global_ctx *ctx,
 	struct nvme_ctrl *c;
 	int tmo, ret;
 
-	ret = nvme_create_ctrl(ctx, trcfg->subsysnqn, trcfg->transport,
-			       trcfg->traddr, trcfg->host_traddr,
-			       trcfg->host_iface, trcfg->trsvcid, &c);
+	ret = nvme_create_ctrl(ctx, trcfg->subsysnqn,
+		trcfg->transport, trcfg->traddr, trcfg->trsvcid,
+		trcfg->host_traddr, trcfg->host_iface, &c);
 	if (ret)
 		return ret;
 
@@ -3325,9 +3320,9 @@ int nvmf_connect(struct nvme_global_ctx *ctx, struct nvmf_context *fctx)
 		return -EALREADY;
 	}
 
-	err = nvme_create_ctrl(ctx, trcfg.subsysnqn, trcfg.transport,
-		trcfg.traddr, trcfg.host_traddr, trcfg.host_iface,
-		trcfg.trsvcid, &c);
+	err = nvme_create_ctrl(ctx, trcfg.subsysnqn,
+		trcfg.transport, trcfg.traddr, trcfg.trsvcid,
+		trcfg.host_traddr, trcfg.host_iface, &c);
 	if (err)
 		return err;
 

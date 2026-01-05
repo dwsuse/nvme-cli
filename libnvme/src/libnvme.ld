@@ -249,6 +249,7 @@ LIBNVME_2_0 {
 		nvme_submit_admin_passthru;
 		nvme_submit_io_passthru;
 		nvme_subsys_filter;
+		nvme_subsystem_add_ctrl;
 		nvme_subsystem_first_ctrl;
 		nvme_subsystem_first_ns;
 		nvme_subsystem_get_application;

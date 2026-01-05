@@ -688,8 +688,8 @@ struct nvme_ns {
 		  const char *host_iface = NULL,
 		  const char *trsvcid = NULL) {
 		struct nvme_ctrl *c;
-		if (nvme_create_ctrl(ctx, subsysnqn, transport, traddr,
-					host_traddr, host_iface, trsvcid, &c))
+		if (nvme_create_ctrl(ctx, subsysnqn, transport, traddr, trsvcid,
+					host_traddr, host_iface, &c))
 			return NULL;
 		return c;
 	}

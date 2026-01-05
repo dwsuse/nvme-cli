@@ -1426,10 +1426,10 @@ static bool traddr_is_hostname(const char *transport, const char *traddr)
 }
 
 int nvme_create_ctrl(struct nvme_global_ctx *ctx,
-		     const char *subsysnqn, const char *transport,
-		     const char *traddr, const char *host_traddr,
-	   	     const char *host_iface, const char *trsvcid,
-		     nvme_ctrl_t *cp)
+		const char *subsysnqn, const char *transport,
+		const char *traddr, const char *trsvcid,
+		const char *host_traddr, const char *host_iface,
+		nvme_ctrl_t *cp)
 {
 	struct nvme_ctrl *c;
 
@@ -1815,30 +1815,6 @@ static void _candidate_free(struct candidate_args *candidate)
 
 #define _cleanup_candidate_ __cleanup__(_candidate_free)
 
-nvme_ctrl_t __nvme_lookup_ctrl(nvme_subsystem_t s, const char *transport,
-			       const char *traddr, const char *host_traddr,
-			       const char *host_iface, const char *trsvcid,
-			       const char *subsysnqn, nvme_ctrl_t p)
-{
-	_cleanup_candidate_ struct candidate_args candidate = {};
-	struct nvme_ctrl *c, *matching_c = NULL;
-	ctrl_match_t ctrl_match;
-
-	/* Init candidate and get the matching function to use */
-	ctrl_match = _candidate_init(&candidate, transport, traddr, trsvcid,
-				     subsysnqn, host_traddr, host_iface);
-
-	c = p ? nvme_subsystem_next_ctrl(s, p) : nvme_subsystem_first_ctrl(s);
-	for (; c != NULL; c = nvme_subsystem_next_ctrl(s, c)) {
-		if (ctrl_match(c, &candidate)) {
-			matching_c = c;
-			break;
-		}
-	}
-
-	return matching_c;
-}
-
 bool nvme_ctrl_config_match(struct nvme_ctrl *c, const char *transport,
 			    const char *traddr, const char *trsvcid,
 			    const char *subsysnqn, const char *host_traddr,
@@ -1854,42 +1830,37 @@ bool nvme_ctrl_config_match(struct nvme_ctrl *c, const char *transport,
 	return ctrl_match(c, &candidate);
 }
 
-nvme_ctrl_t nvme_ctrl_find(nvme_subsystem_t s, const char *transport,
-			   const char *traddr, const char *trsvcid,
-			   const char *subsysnqn, const char *host_traddr,
-			   const char *host_iface)
+int nvme_subsystem_add_ctrl(struct nvme_subsystem *s, struct nvme_ctrl *c)
 {
-	return __nvme_lookup_ctrl(s, transport, traddr, host_traddr, host_iface,
-				  trsvcid, subsysnqn, NULL/*p*/);
+	c->s = s;
+	list_add_tail(&s->ctrls, &c->entry);
+
+	return 0;
 }
 
 nvme_ctrl_t nvme_lookup_ctrl(nvme_subsystem_t s, const char *transport,
-			     const char *traddr, const char *host_traddr,
-			     const char *host_iface, const char *trsvcid,
-			     nvme_ctrl_t p)
+		const char *traddr, const char *trsvcid,
+		const char *host_traddr, const char *host_iface)
 {
-	struct nvme_global_ctx *ctx;
-	struct nvme_ctrl *c;
-	int ret;
+	_cleanup_candidate_ struct candidate_args candidate = {};
+	struct nvme_ctrl *c, *matching_c = NULL;
+	ctrl_match_t ctrl_match;
 
 	if (!s || !transport)
 		return NULL;
 
-	c = __nvme_lookup_ctrl(s, transport, traddr, host_traddr,
-			       host_iface, trsvcid, NULL, p);
-	if (c)
-		return c;
+	/* Init candidate and get the matching function to use */
+	ctrl_match = _candidate_init(&candidate, transport, traddr, trsvcid,
+				     s->subsysnqn, host_traddr, host_iface);
 
-	ctx = s->h ? s->h->ctx : NULL;
-	ret = nvme_create_ctrl(ctx, s->subsysnqn, transport, traddr,
-			     host_traddr, host_iface, trsvcid, &c);
-	if (ret)
-		return NULL;
+	nvme_subsystem_for_each_ctrl(s, c) {
+		if (ctrl_match(c, &candidate)) {
+			matching_c = c;
+			break;
+		}
+	}
 
-	c->s = s;
-	list_add_tail(&s->ctrls, &c->entry);
-
-	return c;
+	return matching_c;
 }
 
 static int nvme_ctrl_scan_paths(struct nvme_global_ctx *ctx, struct nvme_ctrl *c)
@@ -2164,10 +2135,7 @@ int nvme_init_ctrl(nvme_host_t h, nvme_ctrl_t c, int instance)
 	if (s->subsystype && !strcmp(s->subsystype, "discovery"))
 		c->discovery_ctrl = true;
 
-	c->s = s;
-	list_add_tail(&s->ctrls, &c->entry);
-
-	return ret;
+	return nvme_subsystem_add_ctrl(s, c);
 }
 
 int nvme_ctrl_alloc(struct nvme_global_ctx *ctx, nvme_subsystem_t s,
@@ -2178,7 +2146,7 @@ int nvme_ctrl_alloc(struct nvme_global_ctx *ctx, nvme_subsystem_t s,
 	char *host_traddr = NULL, *host_iface = NULL;
 	char *traddr = NULL, *trsvcid = NULL;
 	char *a = NULL, *e = NULL;
-	nvme_ctrl_t c, p;
+	struct nvme_ctrl *c;
 	int ret;
 
 	transport = nvme_get_attr(path, "transport");
@@ -2234,27 +2202,27 @@ int nvme_ctrl_alloc(struct nvme_global_ctx *ctx, nvme_subsystem_t s,
 		}
 	}
 skip_address:
-	p = NULL;
-	do {
-		c = nvme_lookup_ctrl(s, transport, traddr,
-				     host_traddr, host_iface, trsvcid, p);
-		if (c) {
-			if (!c->name)
-				break;
-			if (!strcmp(c->name, name)) {
-				nvme_msg(ctx, LOG_DEBUG,
-					 "found existing ctrl %s\n", c->name);
-				break;
-			}
-			nvme_msg(ctx, LOG_DEBUG, "skipping ctrl %s\n", c->name);
-			p = c;
+	nvme_subsystem_for_each_ctrl(s, c) {
+		if (c->name && !strcmp(c->name, name)) {
+			nvme_msg(ctx, LOG_DEBUG,
+				 "found existing ctrl %s\n", c->name);
+			break;
 		}
-	} while (c);
-	if (!c)
-		c = p;
-	if (!c && !p) {
-		nvme_msg(ctx, LOG_ERR, "failed to lookup ctrl\n");
-		return -ENODEV;
+		nvme_msg(ctx, LOG_DEBUG, "skipping ctrl %s\n", c->name);
+	}
+	if (!c) {
+		ret = nvme_create_ctrl(ctx, nvme_subsystem_get_nqn(s), transport,
+			traddr, host_traddr, host_iface, trsvcid, &c);
+		if (ret) {
+			nvme_msg(ctx, LOG_ERR, "failed to create ctrl\n");
+			return ret;
+		}
+
+		ret = nvme_subsystem_add_ctrl(s, c);
+		if (ret) {
+			nvme_msg(ctx, LOG_ERR, "failed to add ctrl\n");
+			return ret;
+		}
 	}
 	FREE_CTRL_ATTR(c->address);
 	c->address = xstrdup(addr);

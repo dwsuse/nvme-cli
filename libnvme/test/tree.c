@@ -138,10 +138,12 @@ static struct nvme_global_ctx *create_tree()
 				&d->s);
 		}
 		assert(d->s);
-		d->c = nvme_lookup_ctrl(d->s, d->transport, d->traddr,
-					d->host_traddr, d->host_iface,
-					d->trsvcid, NULL);
+		assert(!nvme_create_ctrl(ctx, nvme_subsystem_get_nqn(d->s),
+			d->transport, d->traddr,
+			d->trsvcid, d->host_traddr,
+			d->host_iface, &d->c));
 		assert(d->c);
+		assert(!nvme_subsystem_add_ctrl(d->s, d->c));
 		d->ctrl_id = i;
 
 		printf("    ");
@@ -174,16 +176,16 @@ static bool tcp_ctrl_lookup(nvme_subsystem_t s, struct test_data *d)
 	nvme_ctrl_t c;
 	bool pass = true;
 
-	c = nvme_lookup_ctrl(s, d->transport, d->traddr, NULL,
-			     NULL, d->trsvcid, NULL);
+	c = nvme_lookup_ctrl(s, d->transport, d->traddr,
+		d->trsvcid, NULL, NULL);
 	printf("%10s %12s %10s -> ", d->trsvcid, "", "");
 	show_ctrl(c);
 	pass &= match_ctrl(d, c);
 	printf("\n");
 
 	if (d->host_traddr) {
-		c = nvme_lookup_ctrl(s, d->transport, d->traddr, d->host_traddr,
-				     NULL, d->trsvcid, NULL);
+		c = nvme_lookup_ctrl(s, d->transport, d->traddr,
+			d->trsvcid, d->host_traddr, NULL);
 		printf("%10s %12s %10s -> ", d->trsvcid, d->host_traddr, "");
 		show_ctrl(c);
 		pass &= match_ctrl(d, c);
@@ -191,8 +193,8 @@ static bool tcp_ctrl_lookup(nvme_subsystem_t s, struct test_data *d)
 	}
 
 	if (d->host_iface) {
-		c = nvme_lookup_ctrl(s, d->transport, d->traddr, NULL,
-				     d->host_iface, d->trsvcid, NULL);
+		c = nvme_lookup_ctrl(s, d->transport, d->traddr,
+			d->trsvcid, NULL, d->host_iface);
 		printf("%10s %12s %10s -> ", d->trsvcid, "", d->host_iface);
 		show_ctrl(c);
 		pass &= match_ctrl(d, c);
@@ -200,8 +202,8 @@ static bool tcp_ctrl_lookup(nvme_subsystem_t s, struct test_data *d)
 	}
 
 	if (d->host_iface && d->traddr)	{
-		c = nvme_lookup_ctrl(s, d->transport, d->traddr, d->host_traddr,
-				     d->host_iface, d->trsvcid, NULL);
+		c = nvme_lookup_ctrl(s, d->transport, d->traddr,
+			d->trsvcid, d->host_traddr, d->host_iface);
 		printf("%10s %12s %10s -> ", d->trsvcid, d->host_traddr, d->host_iface);
 		show_ctrl(c);
 		pass &= match_ctrl(d, c);
@@ -216,8 +218,8 @@ static bool default_ctrl_lookup(nvme_subsystem_t s, struct test_data *d)
 	nvme_ctrl_t c;
 	bool pass = true;
 
-	c = nvme_lookup_ctrl(s, d->transport, d->traddr, d->host_traddr,
-			     NULL, NULL, NULL);
+	c = nvme_lookup_ctrl(s, d->transport, d->traddr,
+		NULL, d->host_traddr, NULL);
 	printf("%10s %12s %10s -> ", "", "", "");
 	show_ctrl(c);
 	pass &= match_ctrl(d, c);
@@ -291,7 +293,8 @@ static bool test_src_addr()
 	nvme_create_subsystem(h, DEFAULT_SUBSYSNAME, DEFAULT_SUBSYSNQN, &s);
 	assert(s);
 
-	c = nvme_lookup_ctrl(s, "tcp", "192.168.56.1", NULL, NULL, "8009", NULL);
+	assert(!nvme_create_ctrl(ctx, nvme_subsystem_get_nqn(s),
+		"tcp", "192.168.56.1", "8009", NULL, NULL, &c));
 	assert(c);
 
 	c->address = NULL;
@@ -411,6 +414,7 @@ static bool test_src_addr()
 
 	c->address = NULL; /* Needed to avoid freeing non-malloced memory (see above) */
 
+	nvme_free_ctrl(c);
 	nvme_free_global_ctx(ctx);
 
 	return pass;
@@ -454,7 +458,6 @@ static bool ctrl_match(const char *tag,
 	struct nvme_global_ctx *ctx;
 	nvme_host_t h;
 	nvme_ctrl_t reference_ctrl; /* Existing controller (from sysfs) */
-	nvme_ctrl_t candidate_ctrl;
 	nvme_ctrl_t found_ctrl;
 	nvme_subsystem_t s;
 
@@ -470,36 +473,23 @@ static bool ctrl_match(const char *tag,
 		&s);
 	assert(s);
 
-	reference_ctrl = nvme_lookup_ctrl(s, reference->transport, reference->traddr,
-					  reference->host_traddr, reference->host_iface,
-					  reference->trsvcid, NULL);
+	assert(!nvme_create_ctrl(ctx, nvme_subsystem_get_nqn(s),
+		reference->transport, reference->traddr,
+		reference->trsvcid, reference->host_traddr,
+		reference->host_iface, &reference_ctrl));
 	assert(reference_ctrl);
+	assert(!nvme_subsystem_add_ctrl(s, reference_ctrl));
+
 	reference_ctrl->name = "nvme1";  /* fake the device name */
 	if (reference->address) {
 		reference_ctrl->address = (char *)reference->address;
 	}
 
-	/* nvme_ctrl_find() MUST BE RUN BEFORE nvme_lookup_ctrl() */
-	found_ctrl = nvme_ctrl_find(s, candidate->transport, candidate->traddr,
-				    candidate->trsvcid, candidate->subsysnqn,
-				    candidate->host_traddr,
-				    candidate->host_iface);
-
-	candidate_ctrl = nvme_lookup_ctrl(s, candidate->transport, candidate->traddr,
-					  candidate->host_traddr, candidate->host_iface,
-					  candidate->trsvcid, NULL);
+	found_ctrl = nvme_lookup_ctrl(s, candidate->transport,
+		candidate->traddr, candidate->trsvcid,
+		candidate->host_traddr, candidate->host_iface);
 
 	if (should_match) {
-		if (candidate_ctrl != reference_ctrl) {
-			printf("%s-%d-%d: Candidate (%s, %s, %s, %s, %s, %s) failed to match (%s, %s, %s, %s, %s, %s, %s)\n",
-			       tag, reference_id, candidate_id,
-			       candidate->transport, candidate->traddr, candidate->trsvcid,
-			       candidate->subsysnqn, candidate->host_traddr, candidate->host_iface,
-			       reference->transport, reference->traddr, reference->trsvcid, reference->subsysnqn,
-			       reference->host_traddr, reference->host_iface, reference->address);
-			return false;
-		}
-
 		if (!found_ctrl) {
 			printf("%s-%d-%d: Candidate (%s, %s, %s, %s, %s, %s) failed to find controller\n",
 			       tag, reference_id, candidate_id,
@@ -508,16 +498,6 @@ static bool ctrl_match(const char *tag,
 			return false;
 		}
 	} else {
-		if (candidate_ctrl == reference_ctrl) {
-			printf("%s-%d-%d: Candidate (%s, %s, %s, %s, %s, %s) should not match (%s, %s, %s, %s, %s, %s, %s)\n",
-			       tag, reference_id, candidate_id,
-			       candidate->transport, candidate->traddr, candidate->trsvcid,
-			       candidate->subsysnqn, candidate->host_traddr, candidate->host_iface,
-			       reference->transport, reference->traddr, reference->trsvcid, reference->subsysnqn,
-			       reference->host_traddr, reference->host_iface, reference->address);
-			return false;
-		}
-
 		if (found_ctrl) {
 			printf("%s-%d-%d: Candidate (%s, %s, %s, %s, %s, %s) should not have found controller. found_ctrl=%p reference=%p\n",
 			       tag, reference_id, candidate_id,
@@ -1086,10 +1066,13 @@ static bool ctrl_config_match(const char *tag,
 		&s);
 	assert(s);
 
-	reference_ctrl = nvme_lookup_ctrl(s, reference->transport, reference->traddr,
-					  reference->host_traddr, reference->host_iface,
-					  reference->trsvcid, NULL);
+	assert(!nvme_create_ctrl(ctx, nvme_subsystem_get_nqn(s),
+		reference->transport, reference->traddr,
+		reference->trsvcid, reference->host_traddr,
+		reference->host_iface, &reference_ctrl));
 	assert(reference_ctrl);
+	assert(!nvme_subsystem_add_ctrl(s, reference_ctrl));
+
 	reference_ctrl->name = "nvme1";  /* fake the device name */
 	if (reference->address) {
 		reference_ctrl->address = (char *)reference->address;
