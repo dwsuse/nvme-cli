@@ -9,6 +9,7 @@ LIBNVME_2_0 {
 		nvme_create_ctrl;
 		nvme_create_global_ctx;
 		nvme_create_host;
+		nvme_create_subsystem;
 		nvme_ctrl_config_match;
 		nvme_ctrl_find;
 		nvme_ctrl_first_ns;

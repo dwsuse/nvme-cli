@@ -143,7 +143,7 @@ static void json_parse_subsys(nvme_host_t h, struct json_object *subsys_obj)
 		return;
 	nqn = json_object_get_string(nqn_obj);
 	s = nvme_lookup_subsystem(h, NULL, nqn);
-	if (!s)
+	if (!s && nvme_create_subsystem(h, NULL, nqn, &s))
 		return;
 	app_obj = json_object_object_get(subsys_obj, "application");
 	if (app_obj)

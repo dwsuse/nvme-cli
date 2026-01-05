@@ -1008,8 +1008,9 @@ int fabrics_config(const char *desc, int argc, char **argv)
 		if (hostkey)
 			nvme_host_set_dhchap_key(h, hostkey);
 		s = nvme_lookup_subsystem(h, NULL, subsysnqn);
-		if (!s) {
-			fprintf(stderr, "Failed to lookup subsystem '%s'\n",
+		if (!s && nvme_create_subsystem(h, NULL, subsysnqn, &s)) {
+			fprintf(stderr,
+				"Failed to lookup or create subsystem '%s'\n",
 				subsysnqn);
 			return -ENODEV;
 		}

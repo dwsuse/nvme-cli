@@ -224,15 +224,30 @@ nvme_subsystem_t nvme_first_subsystem(nvme_host_t h);
 nvme_subsystem_t nvme_next_subsystem(nvme_host_t h, nvme_subsystem_t s);
 
 /**
+ * nvme_create_subsystem() - Create a new nvme_subsystem_t object
+ * @h:		&nvme_host_t object
+ * @name:	Name of the subsystem (may be NULL)
+ * @subsysnqn:	Subsystem NQN
+ * @subsys:	Newly allocated subsystem object
+ *
+ * Create a &nvme_subsystem_t object in @h base.
+ *
+ * Return: nvme_subsystem_t object
+ */
+int nvme_create_subsystem(struct nvme_host *h,
+		const char *name, const char *subsysnqn,
+		struct nvme_subsystem **subsys);
+
+/**
  * nvme_lookup_subsystem() - Lookup nvme_subsystem_t object
  * @h:		&nvme_host_t object
  * @name:	Name of the subsystem (may be NULL)
  * @subsysnqn:	Subsystem NQN
  *
  * Lookup a &nvme_subsystem_t object in @h base on @name (if present)
- * and @subsysnqn or create one if not found.
+ * and @subsysnqn.
  *
- * Return: nvme_subsystem_t object
+ * Return: nvme_subsystem_t object if found.
  */
 nvme_subsystem_t nvme_lookup_subsystem(struct nvme_host *h,
 				       const char *name,

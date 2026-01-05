@@ -696,25 +696,35 @@ void nvme_free_subsystem(nvme_subsystem_t s)
 {
 }
 
-struct nvme_subsystem *nvme_alloc_subsystem(struct nvme_host *h,
-					    const char *name,
-					    const char *subsysnqn)
+int nvme_create_subsystem(struct nvme_host *h,
+		const char *name, const char *subsysnqn,
+		struct nvme_subsystem **subsys)
 {
 	struct nvme_subsystem *s;
+	int err;
 
 	s = calloc(1, sizeof(*s));
 	if (!s)
-		return NULL;
+		return -ENOMEM;
 
 	s->h = h;
 	s->subsysnqn = strdup(subsysnqn);
-	if (name)
-		nvme_init_subsystem(s, name);
+	if (name) {
+		err = nvme_init_subsystem(s, name);
+		if (err) {
+			free(s);
+			return err;
+		}
+	}
+
 	list_head_init(&s->ctrls);
 	list_head_init(&s->namespaces);
 	list_node_init(&s->entry);
 	list_add_tail(&h->subsystems, &s->entry);
-	return s;
+
+	*subsys = s;
+
+	return 0;
 }
 
 struct nvme_subsystem *nvme_lookup_subsystem(struct nvme_host *h,
@@ -738,7 +748,7 @@ struct nvme_subsystem *nvme_lookup_subsystem(struct nvme_host *h,
 		}
 		return s;
 	}
-	return nvme_alloc_subsystem(h, name, subsysnqn);
+	return NULL;
 }
 
 static void __nvme_free_host(struct nvme_host *h)
@@ -913,9 +923,9 @@ static int nvme_scan_subsystem(struct nvme_global_ctx *ctx, const char *name)
 		ret = nvme_default_host(ctx, &h);
 		if (ret)
 			return ret;
-		s = nvme_alloc_subsystem(h, name, subsysnqn);
-		if (!s)
-			return -ENOMEM;
+		ret = nvme_create_subsystem(h, name, subsysnqn, &s);
+		if (ret)
+			return ret;
 		if (!nvme_subsystem_scan_namespaces(ctx, s))
 			return -EINVAL;
 	} else if (strcmp(s->subsysnqn, subsysnqn)) {
@@ -2306,7 +2316,7 @@ int nvme_scan_ctrl(struct nvme_global_ctx *ctx, const char *name,
 	}
 
 	s = nvme_lookup_subsystem(h, subsysname, subsysnqn);
-	if (!s)
+	if (!s && nvme_create_subsystem(h, subsysname, subsysnqn, &s))
 		return -ENOMEM;
 
 	ret = nvme_ctrl_alloc(ctx, s, path, name, &c);

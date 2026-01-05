@@ -133,6 +133,10 @@ static struct nvme_global_ctx *create_tree()
 		struct test_data *d = &test_data[i];
 
 		d->s = nvme_lookup_subsystem(h, d->subsysname, d->subsysnqn);
+		if (!d->s) {
+			nvme_create_subsystem(h, d->subsysname, d->subsysnqn,
+				&d->s);
+		}
 		assert(d->s);
 		d->c = nvme_lookup_ctrl(d->s, d->transport, d->traddr,
 					d->host_traddr, d->host_iface,
@@ -284,7 +288,7 @@ static bool test_src_addr()
 	nvme_default_host(ctx, &h);
 	assert(h);
 
-	s = nvme_lookup_subsystem(h, DEFAULT_SUBSYSNAME, DEFAULT_SUBSYSNQN);
+	nvme_create_subsystem(h, DEFAULT_SUBSYSNAME, DEFAULT_SUBSYSNQN, &s);
 	assert(s);
 
 	c = nvme_lookup_ctrl(s, "tcp", "192.168.56.1", NULL, NULL, "8009", NULL);
@@ -460,7 +464,10 @@ static bool ctrl_match(const char *tag,
 	nvme_default_host(ctx, &h);
 	assert(h);
 
-	s = nvme_lookup_subsystem(h, DEFAULT_SUBSYSNAME, reference->subsysnqn ? reference->subsysnqn : DEFAULT_SUBSYSNQN);
+	nvme_create_subsystem(h, DEFAULT_SUBSYSNAME,
+		reference->subsysnqn ?
+			reference->subsysnqn : DEFAULT_SUBSYSNQN,
+		&s);
 	assert(s);
 
 	reference_ctrl = nvme_lookup_ctrl(s, reference->transport, reference->traddr,
@@ -1073,7 +1080,10 @@ static bool ctrl_config_match(const char *tag,
 	nvme_default_host(ctx, &h);
 	assert(h);
 
-	s = nvme_lookup_subsystem(h, DEFAULT_SUBSYSNAME, reference->subsysnqn ? reference->subsysnqn : DEFAULT_SUBSYSNQN);
+	nvme_create_subsystem(h, DEFAULT_SUBSYSNAME,
+		reference->subsysnqn ?
+			reference->subsysnqn : DEFAULT_SUBSYSNQN,
+		&s);
 	assert(s);
 
 	reference_ctrl = nvme_lookup_ctrl(s, reference->transport, reference->traddr,

@@ -613,7 +613,11 @@ struct nvme_ns {
 	nvme_subsystem(struct nvme_host *host,
 		       const char *subsysnqn,
 		       const char *name = NULL) {
-		return nvme_lookup_subsystem(host, name, subsysnqn);
+		struct nvme_subsystem *s;
+		s = nvme_lookup_subsystem(host, name, subsysnqn);
+		if (!s && nvme_create_subsystem(host, name, subsysnqn, &s))
+			return NULL;
+		return s;
 	}
 	~nvme_subsystem() {
 		nvme_free_subsystem($self);
