@@ -306,7 +306,7 @@ struct nvme_global_ctx {
 #endif
 };
 
-struct nvmf_context {
+struct nvmf_context { /*!generate-accessors*/
 	/* common callbacks */
 	bool (*decide_retry)(struct nvmf_context *fctx, int err,
 			void *user_data);
@@ -332,7 +332,7 @@ struct nvmf_context {
 	int default_keep_alive_timeout;
 
 	/* common fabrics configuraiton */
-	const char *device;
+	char *device;
 	bool persistent;
 	struct nvme_fabrics_config *cfg;
 

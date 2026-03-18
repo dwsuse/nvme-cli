@@ -287,20 +287,6 @@ __public int nvmf_context_set_crypto(struct nvmf_context *fctx,
 	return 0;
 }
 
-__public int nvmf_context_set_persistent(struct nvmf_context *fctx, bool persistent)
-{
-	fctx->persistent = persistent;
-
-	return 0;
-}
-
-__public int nvmf_context_set_device(struct nvmf_context *fctx, const char *device)
-{
-	fctx->device = device;
-
-	return 0;
-}
-
 /*
  * Derived from Linux's supported options (the opt_tokens table)
  * when the mechanism to report supported options was added (f18ee3d988157).
@@ -931,6 +917,8 @@ static int __nvmf_add_ctrl(struct nvme_global_ctx *ctx, const char *argstr)
 			return -ENVME_CONNECT_ADDRNOTAVAIL;
 		case ENOKEY:
 			return -ENVME_CONNECT_NOKEY;
+		case ENOENT:
+			return -ENVME_CONNECT_COMPNOTFOUND;
 		default:
 			return -ENVME_CONNECT_WRITE;
 		}
@@ -2389,8 +2377,8 @@ __public int nvmf_discovery_config_file(struct nvme_global_ctx *ctx,
 	return 0;
 }
 
-__public int nvmf_config_modify(struct nvme_global_ctx *ctx,
-		struct nvmf_context *fctx)
+static int lookup_ctrl_from_fctx(struct nvme_global_ctx *ctx,
+		struct nvmf_context *fctx, struct nvme_ctrl **ctrl)
 {
 	_cleanup_free_ char *hnqn = NULL;
 	_cleanup_free_ char *hid = NULL;
@@ -2405,7 +2393,7 @@ __public int nvmf_config_modify(struct nvme_global_ctx *ctx,
 
 	h = nvme_lookup_host(ctx, fctx->hostnqn, fctx->hostid);
 	if (!h) {
-		nvme_msg(ctx, LOG_ERR, "Failed to lookup host '%s'\n",
+		nvme_msg(ctx, LOG_DEBUG, "Failed to lookup host '%s'\n",
 			fctx->hostnqn);
 		return -ENODEV;
 	}
@@ -2415,16 +2403,44 @@ __public int nvmf_config_modify(struct nvme_global_ctx *ctx,
 
 	s = nvme_lookup_subsystem(h, NULL, fctx->subsysnqn);
 	if (!s) {
-		nvme_msg(ctx, LOG_ERR, "Failed to lookup subsystem '%s'\n",
+		nvme_msg(ctx, LOG_DEBUG, "Failed to lookup subsystem '%s'\n",
 			fctx->subsysnqn);
 		return -ENODEV;
 	}
 
 	c = nvme_lookup_ctrl(s, fctx, NULL);
 	if (!c) {
-		nvme_msg(ctx, LOG_ERR, "Failed to lookup controller\n");
+		nvme_msg(ctx, LOG_DEBUG, "Failed to lookup controller\n");
 		return -ENODEV;
 	}
+
+	*ctrl = c;
+	return 0;
+}
+
+__public int nvmf_disconnect(struct nvme_global_ctx *ctx,
+		struct nvmf_context *fctx)
+{
+	struct nvme_ctrl *c;
+	int err;
+
+	err = lookup_ctrl_from_fctx(ctx, fctx, &c);
+	if (!err)
+		err = nvme_disconnect_ctrl(c);
+
+	return err;
+}
+
+__public int nvmf_config_modify(struct nvme_global_ctx *ctx,
+		struct nvmf_context *fctx)
+{
+	struct nvme_ctrl *c;
+	int err;
+
+	err = lookup_ctrl_from_fctx(ctx, fctx, &c);
+	if (err)
+		return err;
+
 	if (fctx->ctrlkey)
 		nvme_ctrl_set_dhchap_ctrl_key(c, fctx->ctrlkey);
 

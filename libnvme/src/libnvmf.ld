@@ -19,6 +19,7 @@ LIBNVMF_3 {
 		nvmf_context_set_hostnqn;
 		nvmf_context_set_persistent;
 		nvmf_default_config;
+		nvmf_disconnect;
 		nvmf_discovery;
 		nvmf_discovery_config_file;
 		nvmf_discovery_config_json;

@@ -886,3 +886,124 @@ __public bool nvme_fabric_options_get_trsvcid(
 	return p->trsvcid;
 }
 
+/****************************************************************************
+ * Accessors for: struct nvmf_context
+ ****************************************************************************/
+
+__public void nvmf_context_set_default_max_discovery_retries(
+		struct nvmf_context *p,
+		int default_max_discovery_retries)
+{
+	p->default_max_discovery_retries = default_max_discovery_retries;
+}
+
+__public int nvmf_context_get_default_max_discovery_retries(
+		const struct nvmf_context *p)
+{
+	return p->default_max_discovery_retries;
+}
+
+__public void nvmf_context_set_default_keep_alive_timeout(
+		struct nvmf_context *p,
+		int default_keep_alive_timeout)
+{
+	p->default_keep_alive_timeout = default_keep_alive_timeout;
+}
+
+__public int nvmf_context_get_default_keep_alive_timeout(
+		const struct nvmf_context *p)
+{
+	return p->default_keep_alive_timeout;
+}
+
+__public void nvmf_context_set_device(
+		struct nvmf_context *p,
+		const char *device)
+{
+	free(p->device);
+	p->device = device ? strdup(device) : NULL;
+}
+
+__public const char *nvmf_context_get_device(const struct nvmf_context *p)
+{
+	return p->device;
+}
+
+__public void nvmf_context_set_persistent(
+		struct nvmf_context *p,
+		bool persistent)
+{
+	p->persistent = persistent;
+}
+
+__public bool nvmf_context_get_persistent(const struct nvmf_context *p)
+{
+	return p->persistent;
+}
+
+__public const char *nvmf_context_get_subsysnqn(const struct nvmf_context *p)
+{
+	return p->subsysnqn;
+}
+
+__public const char *nvmf_context_get_transport(const struct nvmf_context *p)
+{
+	return p->transport;
+}
+
+__public const char *nvmf_context_get_traddr(const struct nvmf_context *p)
+{
+	return p->traddr;
+}
+
+__public const char *nvmf_context_get_trsvcid(const struct nvmf_context *p)
+{
+	return p->trsvcid;
+}
+
+__public const char *nvmf_context_get_host_traddr(const struct nvmf_context *p)
+{
+	return p->host_traddr;
+}
+
+__public const char *nvmf_context_get_host_iface(const struct nvmf_context *p)
+{
+	return p->host_iface;
+}
+
+__public const char *nvmf_context_get_hostnqn(const struct nvmf_context *p)
+{
+	return p->hostnqn;
+}
+
+__public const char *nvmf_context_get_hostid(const struct nvmf_context *p)
+{
+	return p->hostid;
+}
+
+__public const char *nvmf_context_get_hostkey(const struct nvmf_context *p)
+{
+	return p->hostkey;
+}
+
+__public const char *nvmf_context_get_ctrlkey(const struct nvmf_context *p)
+{
+	return p->ctrlkey;
+}
+
+__public const char *nvmf_context_get_keyring(const struct nvmf_context *p)
+{
+	return p->keyring;
+}
+
+__public const char *nvmf_context_get_tls_key(const struct nvmf_context *p)
+{
+	return p->tls_key;
+}
+
+__public const char *nvmf_context_get_tls_key_identity(
+		const struct nvmf_context *p)
+{
+	return p->tls_key_identity;
+}
+

@@ -350,6 +350,15 @@ endif
 
 conf.set('CONFIG_DBUS', libdbus_dep.found(), description: 'Enable dbus support?')
 
+if not want_fabrics or get_option('libsystemd').disabled()
+    libsystemd_dep = dependency('', required: false)
+else
+    libsystemd_dep = dependency('libsystemd')
+endif
+
+conf.set('CONFIG_LIBSYSTEMD', libsystemd_dep.found(),
+    description: 'Enable libsystemd support?')
+
 conf.set10(
     'HAVE_STATEMENT_EXPR',
     cc.compiles(
@@ -511,6 +520,7 @@ if want_nvme
             libnvme_dep,
             json_c_dep,
             libudev_dep,
+            libsystemd_dep,
         ],
         link_args: '-ldl',
         install: true,
@@ -640,6 +650,7 @@ dep_dict = {
     'python3':          py3_dep.found(),
     'liburing':         liburing_dep.found(),
     'libudev':          libudev_dep.found(),
+    'libsystemd':       libsystemd_dep.found(),
 }
 summary(dep_dict, section: 'Dependencies', bool_yn: true)
 

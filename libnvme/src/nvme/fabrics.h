@@ -478,29 +478,6 @@ int nvmf_context_set_crypto(struct nvmf_context *fctx,
 		const char *tls_key_identity);
 
 /**
- * nvmf_context_set_persistent() - Set persistence for context
- * @fctx: Fabrics context
- * @persistent: Whether to enable persistent connections
- *
- * Sets whether the context should use persistent connections.
- *
- * Return: 0 on success, or a negative error code on failure.
- */
-
-int nvmf_context_set_persistent(struct nvmf_context *fctx, bool persistent);
-
-/**
- * nvmf_context_set_device() - Set device for context
- * @fctx: Fabrics context
- * @device: Device path or identifier
- *
- * Sets the device to be used by the context.
- *
- * Return: 0 on success, or a negative error code on failure.
- */
-int nvmf_context_set_device(struct nvmf_context *fctx, const char *device);
-
-/**
  * nvmf_discovery() - Perform fabrics discovery
  * @ctx: Global context
  * @fctx: Fabrics context
@@ -578,6 +555,17 @@ int nvmf_connect(struct nvme_global_ctx *ctx, struct nvmf_context *fctx);
  */
 int nvmf_connect_config_json(struct nvme_global_ctx *ctx,
 		struct nvmf_context *fctx);
+
+/**
+ * nvmf_disconnect() - Disconnect from fabrics subsystem
+ * @ctx: Global context
+ * @fctx: Fabrics context
+ *
+ * Disconnects from the fabrics subsystem using the provided context.
+ *
+ * Return: 0 on success, or a negative error code on failure.
+ */
+int nvmf_disconnect(struct nvme_global_ctx *ctx, struct nvmf_context *fctx);
 
 /**
  * nvmf_config_modify() - Modify and update the configurtion

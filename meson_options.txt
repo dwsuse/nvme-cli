@@ -149,6 +149,12 @@ option(
   description : 'libudev support'
 )
 option(
+  'libsystemd',
+  type : 'feature',
+  value: 'enabled',
+  description : 'libsystemd support'
+)
+option(
   'pypi',
   type : 'boolean',
   value : false,

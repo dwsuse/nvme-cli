@@ -33,6 +33,7 @@ struct nvme_ctrl;
 struct nvme_subsystem;
 struct nvme_host;
 struct nvme_fabric_options;
+struct nvmf_context;
 
 /****************************************************************************
  * Accessors for: struct nvme_path
@@ -1198,5 +1199,178 @@ void nvme_fabric_options_set_trsvcid(
  * Return: The value of the trsvcid field.
  */
 bool nvme_fabric_options_get_trsvcid(const struct nvme_fabric_options *p);
+
+/****************************************************************************
+ * Accessors for: struct nvmf_context
+ ****************************************************************************/
+
+/**
+ * nvmf_context_set_default_max_discovery_retries() - Set default_max_discovery_retries.
+ * @p: The &struct nvmf_context instance to update.
+ * @default_max_discovery_retries: Value to assign to the default_max_discovery_retries field.
+ */
+void nvmf_context_set_default_max_discovery_retries(
+		struct nvmf_context *p,
+		int default_max_discovery_retries);
+
+/**
+ * nvmf_context_get_default_max_discovery_retries() - Get default_max_discovery_retries.
+ * @p: The &struct nvmf_context instance to query.
+ *
+ * Return: The value of the default_max_discovery_retries field.
+ */
+int nvmf_context_get_default_max_discovery_retries(
+		const struct nvmf_context *p);
+
+/**
+ * nvmf_context_set_default_keep_alive_timeout() - Set default_keep_alive_timeout.
+ * @p: The &struct nvmf_context instance to update.
+ * @default_keep_alive_timeout: Value to assign to the default_keep_alive_timeout field.
+ */
+void nvmf_context_set_default_keep_alive_timeout(
+		struct nvmf_context *p,
+		int default_keep_alive_timeout);
+
+/**
+ * nvmf_context_get_default_keep_alive_timeout() - Get default_keep_alive_timeout.
+ * @p: The &struct nvmf_context instance to query.
+ *
+ * Return: The value of the default_keep_alive_timeout field.
+ */
+int nvmf_context_get_default_keep_alive_timeout(const struct nvmf_context *p);
+
+/**
+ * nvmf_context_set_device() - Set device.
+ * @p: The &struct nvmf_context instance to update.
+ * @device: New string; a copy is stored. Pass NULL to clear.
+ */
+void nvmf_context_set_device(struct nvmf_context *p, const char *device);
+
+/**
+ * nvmf_context_get_device() - Get device.
+ * @p: The &struct nvmf_context instance to query.
+ *
+ * Return: The value of the device field, or NULL if not set.
+ */
+const char *nvmf_context_get_device(const struct nvmf_context *p);
+
+/**
+ * nvmf_context_set_persistent() - Set persistent.
+ * @p: The &struct nvmf_context instance to update.
+ * @persistent: Value to assign to the persistent field.
+ */
+void nvmf_context_set_persistent(struct nvmf_context *p, bool persistent);
+
+/**
+ * nvmf_context_get_persistent() - Get persistent.
+ * @p: The &struct nvmf_context instance to query.
+ *
+ * Return: The value of the persistent field.
+ */
+bool nvmf_context_get_persistent(const struct nvmf_context *p);
+
+/**
+ * nvmf_context_get_subsysnqn() - Get subsysnqn.
+ * @p: The &struct nvmf_context instance to query.
+ *
+ * Return: The value of the subsysnqn field, or NULL if not set.
+ */
+const char *nvmf_context_get_subsysnqn(const struct nvmf_context *p);
+
+/**
+ * nvmf_context_get_transport() - Get transport.
+ * @p: The &struct nvmf_context instance to query.
+ *
+ * Return: The value of the transport field, or NULL if not set.
+ */
+const char *nvmf_context_get_transport(const struct nvmf_context *p);
+
+/**
+ * nvmf_context_get_traddr() - Get traddr.
+ * @p: The &struct nvmf_context instance to query.
+ *
+ * Return: The value of the traddr field, or NULL if not set.
+ */
+const char *nvmf_context_get_traddr(const struct nvmf_context *p);
+
+/**
+ * nvmf_context_get_trsvcid() - Get trsvcid.
+ * @p: The &struct nvmf_context instance to query.
+ *
+ * Return: The value of the trsvcid field, or NULL if not set.
+ */
+const char *nvmf_context_get_trsvcid(const struct nvmf_context *p);
+
+/**
+ * nvmf_context_get_host_traddr() - Get host_traddr.
+ * @p: The &struct nvmf_context instance to query.
+ *
+ * Return: The value of the host_traddr field, or NULL if not set.
+ */
+const char *nvmf_context_get_host_traddr(const struct nvmf_context *p);
+
+/**
+ * nvmf_context_get_host_iface() - Get host_iface.
+ * @p: The &struct nvmf_context instance to query.
+ *
+ * Return: The value of the host_iface field, or NULL if not set.
+ */
+const char *nvmf_context_get_host_iface(const struct nvmf_context *p);
+
+/**
+ * nvmf_context_get_hostnqn() - Get hostnqn.
+ * @p: The &struct nvmf_context instance to query.
+ *
+ * Return: The value of the hostnqn field, or NULL if not set.
+ */
+const char *nvmf_context_get_hostnqn(const struct nvmf_context *p);
+
+/**
+ * nvmf_context_get_hostid() - Get hostid.
+ * @p: The &struct nvmf_context instance to query.
+ *
+ * Return: The value of the hostid field, or NULL if not set.
+ */
+const char *nvmf_context_get_hostid(const struct nvmf_context *p);
+
+/**
+ * nvmf_context_get_hostkey() - Get hostkey.
+ * @p: The &struct nvmf_context instance to query.
+ *
+ * Return: The value of the hostkey field, or NULL if not set.
+ */
+const char *nvmf_context_get_hostkey(const struct nvmf_context *p);
+
+/**
+ * nvmf_context_get_ctrlkey() - Get ctrlkey.
+ * @p: The &struct nvmf_context instance to query.
+ *
+ * Return: The value of the ctrlkey field, or NULL if not set.
+ */
+const char *nvmf_context_get_ctrlkey(const struct nvmf_context *p);
+
+/**
+ * nvmf_context_get_keyring() - Get keyring.
+ * @p: The &struct nvmf_context instance to query.
+ *
+ * Return: The value of the keyring field, or NULL if not set.
+ */
+const char *nvmf_context_get_keyring(const struct nvmf_context *p);
+
+/**
+ * nvmf_context_get_tls_key() - Get tls_key.
+ * @p: The &struct nvmf_context instance to query.
+ *
+ * Return: The value of the tls_key field, or NULL if not set.
+ */
+const char *nvmf_context_get_tls_key(const struct nvmf_context *p);
+
+/**
+ * nvmf_context_get_tls_key_identity() - Get tls_key_identity.
+ * @p: The &struct nvmf_context instance to query.
+ *
+ * Return: The value of the tls_key_identity field, or NULL if not set.
+ */
+const char *nvmf_context_get_tls_key_identity(const struct nvmf_context *p);
 
 #endif /* _ACCESSORS_H_ */
