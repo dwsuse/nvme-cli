@@ -376,9 +376,7 @@ int nvmf_context_create(struct nvme_global_ctx *ctx,
 		void (*connected)(struct nvmf_context *fctx,
 			struct nvme_ctrl *c, void *user_data),
 		void (*already_connected)(struct nvmf_context *fctx,
-			struct nvme_host *host, const char *subsysnqn,
-			const char *transport, const char *traddr,
-			const char *trsvcid, void *user_data),
+			struct nvme_ctrl *c,  void *user_data),
 		void *user_data, struct nvmf_context **fctxp);
 
 /**

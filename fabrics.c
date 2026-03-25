@@ -178,6 +178,7 @@ struct cb_fabrics_data {
 	char *raw;
 	char **argv;
 	FILE *f;
+	struct nvme_ctrl *ctrl;
 };
 
 static bool cb_decide_retry(struct nvmf_context *fctx, int err,
@@ -195,6 +196,8 @@ static void cb_connected(struct nvmf_context *fctx,
 		struct nvme_ctrl *c, void *user_data)
 {
 	struct cb_fabrics_data *cfd = user_data;
+
+	cfd->ctrl = c;
 
 	if (cfd->flags == NORMAL) {
 		printf("device: %s\n", nvme_ctrl_get_name(c));
@@ -218,16 +221,27 @@ static void cb_connected(struct nvmf_context *fctx,
 }
 
 static void cb_already_connected(struct nvmf_context *fctx,
-		struct nvme_host *host, const char *subsysnqn,
-		const char *transport, const char *traddr,
-		const char *trsvcid, void *user_data)
+		struct nvme_ctrl *c, void *user_data)
 {
+	struct nvme_subsystem *s;
+	struct nvme_host *h;
+
+	struct cb_fabrics_data *cfd = user_data;
+
+	cfd->ctrl = c;
+
 	if (quiet)
 		return;
 
+	s = nvme_ctrl_get_subsystem(c);
+	h = nvme_subsystem_get_host(s);
+
 	fprintf(stderr,	"already connected to hostnqn=%s,nqn=%s,transport=%s,traddr=%s,trsvcid=%s\n",
-		nvme_host_get_hostnqn(host), subsysnqn,
-		transport, traddr, trsvcid);
+		nvme_host_get_hostnqn(h),
+		nvme_ctrl_get_subsysnqn(c),
+		nvme_ctrl_get_transport(c),
+		nvme_ctrl_get_traddr(c),
+		nvme_ctrl_get_trsvcid(c));
 }
 
 static void cb_discovery_log(struct nvmf_context *fctx,
@@ -581,12 +595,82 @@ out_free:
 	return ret;
 }
 
+#ifdef CONFIG_LIBUDEV
+#include <libudev.h>
+
+static int monitor_udev(const char *device)
+{
+	_cleanup_free_ char *devname = NULL;
+	struct udev_monitor *mon;
+	struct udev *udev;
+	int fd, err;
+
+	udev = udev_new();
+	mon = udev_monitor_new_from_netlink(udev, "udev");
+
+	udev_monitor_filter_add_match_subsystem_devtype(mon, "nvme", NULL);
+	udev_monitor_enable_receiving(mon);
+
+	err = asprintf(&devname, "/dev/%s", device);
+	if (err < 0) {
+		err = -errno;
+		goto out;
+	}
+
+	printf("monitoring udev events for %s\n", devname);
+
+	fd = udev_monitor_get_fd(mon);
+	while (!nvme_sigint_received) {
+		fd_set fds;
+		FD_ZERO(&fds);
+		FD_SET(fd, &fds);
+
+		select(fd + 1, &fds, NULL, NULL, NULL);
+
+		if (FD_ISSET(fd, &fds)) {
+			struct udev_device *dev =
+				udev_monitor_receive_device(mon);
+			const char *devnode = udev_device_get_devnode(dev);
+			struct udev_list_entry *entry;
+
+			if (!devnode || strcmp(devname, devnode))
+				goto skip;
+
+			udev_list_entry_foreach(entry,
+		        udev_device_get_properties_list_entry(dev)) {
+				const char *name = udev_list_entry_get_name(entry);
+				const char *value = udev_list_entry_get_value(entry);
+
+				printf("  %s=%s\n", name, value);
+			}
+			printf("----\n");
+skip:
+			udev_device_unref(dev);
+		}
+	}
+out:
+	udev_unref(udev);
+	udev_monitor_unref(mon);
+
+	return err;
+}
+#else
+static int monitor_udev(const char *devname)
+{
+	while (!nvme_sigint_received)
+		pause();
+
+	return 0;
+}
+#endif
+
 int fabrics_connect(const char *desc, int argc, char **argv)
 {
 	_cleanup_free_ char *hnqn = NULL;
 	_cleanup_free_ char *hid = NULL;
 	char *config_file = NULL;
 	char *context = NULL;
+	bool disconnect_on_sigint = false;
 	_cleanup_nvme_global_ctx_ struct nvme_global_ctx *ctx = NULL;
 	_cleanup_free_ struct nvmf_context *fctx = NULL;
 	_cleanup_nvme_ctrl_ nvme_ctrl_t c = NULL;
@@ -597,8 +681,9 @@ int fabrics_connect(const char *desc, int argc, char **argv)
 
 	NVMF_ARGS(opts, fa, cfg,
 		  OPT_STRING("config",             'J', "FILE", &config_file, nvmf_config_file),
-		  OPT_FLAG("dump-config",          'O', &dump_config,             "Dump JSON configuration to stdout"),
-		  OPT_STRING("context",              0, "STR", &context,  nvmf_context));
+		  OPT_FLAG("dump-config",          'O', &dump_config, "Dump JSON configuration to stdout"),
+		  OPT_STRING("context",              0, "STR", &context,  nvmf_context),
+		  OPT_FLAG("disconnect-on-sigint",   0, &disconnect_on_sigint, "Wait for Ctrl+C and disconnect the controller"));
 
 	nvmf_default_config(&cfg);
 
@@ -672,7 +757,7 @@ do_connect:
 		return nvmf_connect_config_json(ctx, fctx);
 
 	ret = nvmf_connect(ctx, fctx);
-	if (ret) {
+	if (ret && ret != -EALREADY) {
 		fprintf(stderr, "failed to connect: %s\n",
 			nvme_strerror(-ret));
 		return ret;
@@ -680,6 +765,11 @@ do_connect:
 
 	if (dump_config)
 		nvme_dump_config(ctx, STDERR_FILENO);
+
+	if (disconnect_on_sigint) {
+		monitor_udev(nvme_ctrl_get_name(dld.ctrl));
+		nvme_disconnect_ctrl(dld.ctrl);
+	}
 
 	return 0;
 }

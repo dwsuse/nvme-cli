@@ -287,6 +287,13 @@ else
 endif
 conf.set('CONFIG_LIBURING', liburing_dep.found(), description: 'Is liburing available?')
 
+if not want_fabrics or get_option('libudev').disabled()
+    libudev_dep = dependency('', required: false)
+else
+    libudev_dep = dependency('libudev', required: get_option('libudev'))
+endif
+conf.set('CONFIG_LIBUDEV', libudev_dep.found(), description: 'Is libudev available?')
+
 if not want_fabrics or get_option('openssl').disabled()
     openssl_dep = dependency('', required: false)
 else
@@ -503,6 +510,7 @@ if want_nvme
             ccan_dep,
             libnvme_dep,
             json_c_dep,
+            libudev_dep,
         ],
         link_args: '-ldl',
         install: true,
@@ -631,6 +639,7 @@ dep_dict = {
     'libdbus':          libdbus_dep.found(),
     'python3':          py3_dep.found(),
     'liburing':         liburing_dep.found(),
+    'libudev':          libudev_dep.found(),
 }
 summary(dep_dict, section: 'Dependencies', bool_yn: true)
 

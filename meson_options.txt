@@ -143,6 +143,12 @@ option(
   description : 'liburing support'
 )
 option(
+  'libudev',
+  type : 'feature',
+  value: 'auto',
+  description : 'libudev support'
+)
+option(
   'pypi',
   type : 'boolean',
   value : false,

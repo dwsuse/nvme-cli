@@ -193,9 +193,7 @@ __public int nvmf_context_create(struct nvme_global_ctx *ctx,
 		void (*connected)(struct nvmf_context *fctx,
 			struct nvme_ctrl *c, void *user_data),
 		void (*already_connected)(struct nvmf_context *fctx,
-			struct nvme_host *host, const char *subsysnqn,
-			const char *transport, const char *traddr,
-			const char *trsvcid, void *user_data),
+			struct nvme_ctrl *c, void *user_data),
 		void *user_data, struct nvmf_context **fctxp)
 {
 	struct nvmf_context *fctx;
@@ -2006,11 +2004,8 @@ static int _nvmf_discovery(struct nvme_global_ctx *ctx,
 				nvme_free_ctrl(child);
 			}
 		} else if (err == -ENVME_CONNECT_ALREADY) {
-			struct nvmf_disc_log_entry *e = &log->entries[i];
-
-			nfctx.already_connected(&nfctx, h, e->subnqn,
-				nvmf_trtype_str(e->trtype), e->traddr,
-				e->trsvcid, nfctx.user_data);
+			c = lookup_ctrl(h, &nfctx);
+			nfctx.already_connected(&nfctx, c, nfctx.user_data);
 		}
 	}
 
@@ -3015,9 +3010,7 @@ __public int nvmf_connect(struct nvme_global_ctx *ctx, struct nvmf_context *fctx
 
 	c = lookup_ctrl(h, fctx);
 	if (c && nvme_ctrl_get_name(c) && !fctx->cfg->duplicate_connect) {
-		fctx->already_connected(fctx, h, nvme_ctrl_get_subsysnqn(c),
-			nvme_ctrl_get_transport(c), nvme_ctrl_get_traddr(c),
-			nvme_ctrl_get_trsvcid(c), fctx->user_data);
+		fctx->already_connected(fctx, c, fctx->user_data);
 		return -EALREADY;
 	}
 

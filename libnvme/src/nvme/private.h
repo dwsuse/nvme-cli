@@ -313,9 +313,7 @@ struct nvmf_context {
 	void (*connected)(struct nvmf_context *fctx, struct nvme_ctrl *c,
 			void *user_data);
 	void (*already_connected)(struct nvmf_context *fctx,
-			struct nvme_host *host, const char *subsysnqn,
-			const char *transport, const char *traddr,
-			const char *trsvcid, void *user_data);
+			struct nvme_ctrl *c, void *user_data);
 
 	/* discovery callbacks */
 	void (*discovery_log)(struct nvmf_context *fctx,
