@@ -191,6 +191,7 @@ static int libnvme_submit_passthru_async(
 	hdl->uring_pending += 1;
 
 	if (hdl->ctx->dry_run) {
+		req->next = NULL;
 		if (hdl->dry_run_tail)
 			hdl->dry_run_tail->next = req;
 		else
@@ -244,14 +245,14 @@ __libnvme_public int libnvme_reap_passthru_async(
 	if (hdl->uring_state == LIBNVME_IO_URING_STATE_NOT_AVAILABLE)
 		return -ENOTSUP;
 
-	if (!hdl->uring_pending)
-		return -EAGAIN;
-
 	req = nvme_dequeue_dry_run_req(hdl);
 	if (req) {
 		err = 0;
 		goto complete;
 	}
+
+	if (!hdl->uring_pending)
+		return -EAGAIN;
 
 	for (;;) {
 		err = io_uring_wait_cqe(hdl->ring, &cqe);
