@@ -23,6 +23,7 @@
 #include <nvme/tree.h>
 
 struct libnvme_passthru_completion;
+struct libnvme_async_req;
 
 const char *libnvme_subsys_sysfs_dir(void);
 const char *libnvme_ctrl_sysfs_dir(void);
@@ -206,6 +207,8 @@ struct libnvme_transport_handle {
 #ifdef CONFIG_LIBURING
 	unsigned int uring_pending;
 	struct io_uring *ring;
+	struct libnvme_async_req *dry_run_head;
+	struct libnvme_async_req *dry_run_tail;
 #endif
 
 #ifdef CONFIG_MI

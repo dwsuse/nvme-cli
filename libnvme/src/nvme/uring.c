@@ -91,6 +91,21 @@ static int nvme_submit_uring_cmd(struct libnvme_transport_handle *hdl,
 	return 0;
 }
 
+static struct libnvme_async_req *nvme_dequeue_dry_run_req(
+		struct libnvme_transport_handle *hdl)
+{
+	struct libnvme_async_req *req = hdl->dry_run_head;
+
+	if (!req)
+		return NULL;
+
+	hdl->dry_run_head = req->next;
+	if (!hdl->dry_run_head)
+		hdl->dry_run_tail = NULL;
+
+	return req;
+}
+
 void libnvme_close_uring(struct libnvme_transport_handle *hdl)
 {
 	struct libnvme_passthru_completion completion;
@@ -175,8 +190,15 @@ static int libnvme_submit_passthru_async(
 	req->user_data = hdl->submit_entry(hdl, cmd);
 	hdl->uring_pending += 1;
 
-	if (hdl->ctx->dry_run)
+	if (hdl->ctx->dry_run) {
+		if (hdl->dry_run_tail)
+			hdl->dry_run_tail->next = req;
+		else
+			hdl->dry_run_head = req;
+
+		hdl->dry_run_tail = req;
 		return 0;
+	}
 
 	err = nvme_submit_uring_cmd(hdl, req);
 	if (err) {
@@ -222,10 +244,16 @@ __libnvme_public int libnvme_reap_passthru_async(
 	if (hdl->uring_state == LIBNVME_IO_URING_STATE_NOT_AVAILABLE)
 		return -ENOTSUP;
 
-	for (;;) {
-		if (!hdl->uring_pending)
-			return -EAGAIN;
+	if (!hdl->uring_pending)
+		return -EAGAIN;
 
+	req = nvme_dequeue_dry_run_req(hdl);
+	if (req) {
+		err = 0;
+		goto complete;
+	}
+
+	for (;;) {
 		err = io_uring_wait_cqe(hdl->ring, &cqe);
 		if (err < 0)
 			return -errno;
@@ -245,6 +273,7 @@ __libnvme_public int libnvme_reap_passthru_async(
 		break;
 	}
 
+complete:
 	hdl->uring_pending -= 1;
 	hdl->submit_exit(hdl, req->cmd, err, req->user_data);
 	completion->cmd = req->cmd;
