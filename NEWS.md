@@ -22,100 +22,135 @@
 
 ### Feature removals and incompatible changes
 
-* `nvme disconnect-all` with no options no longer disconnects every
-  fabric controller. It now only disconnects controllers with no
-  recorded owner in the new ownership registry (see below); a
-  controller owned by another orchestrator is silently skipped. To
-  restore the old disconnect-everything behavior, use `--force`
-  (prompts for confirmation when run interactively), or use
-  `--owner NAME` to disconnect only the controllers owned by a
-  specific orchestrator.
+* `nvme disconnect-all` without options no longer disconnects all fabric
+  controllers. It now only disconnects controllers with no recorded owner
+  in the new ownership registry. Use `--force` to restore the legacy
+  disconnect-all behavior, or `--owner NAME` to filter by a specific owner.
 
-* Hostname entries in the legacy `config.json` connection file are
-  now rejected with a clear error instead of sometimes silently
-  resolving. Previously this worked via `nvme connect-all`/`nvme
-  discover` but already failed via `nvme connect -J`; both paths now
-  fail the same way. Direct CLI usage is unaffected: `nvme connect
-  -a <hostname>`, `--host-traddr <hostname>`, and discovery.conf
-  entries all still resolve exactly as before. Convert `config.json`
-  to the new INI connection format (see below) to keep using
-  hostnames in a file.
+* New configuration format. Users must convert `config.json` and
+  `discovery.conf` to the new INI format. nvme-cli support migrating
+  existing configuration with `nvme config convert`. If not done
+  explicitly, nvme-cli will auto convert with the first fabric command
+  execute. The existing configuration file will not be removed but it is
+  strongly recommended to remove it when there is no need for it anymore,
+  e.g. no downgrading of nvme-cli needed. See man pages for more details.
 
-* libnvme itself no longer resolves hostnames. `libnvmf_add_ctrl()`
-  and `libnvmf_connect_ctrl()` now fail immediately on a hostname
-  traddr/host_traddr instead of resolving it internally -- the
-  caller is responsible for resolving first. A deliberate, permitted
-  3.0 API break; nvme-stas (the only external consumer using this
-  path) already resolves before calling, so this is a non-issue
-  there in practice.
-
-* Transport IDs (TIDs), the identifier now shared internally by the
-  registry, the exclusion list, and connection matching, only accept
-  a numeric traddr/host_traddr for the tcp and rdma transports; a
-  hostname is rejected at construction time rather than silently
-  accepted.
-
-* *(pending, not yet merged)* The default installation will stop
-  shipping the essentially-empty `/etc/nvme/discovery.conf` stub (a
-  comment-only template with no real entries). Nothing should have
-  been relying on its mere presence for scripting purposes; it was
-  never meant to be more than a placeholder.
+* Default installations no longer ship the stub `/etc/nvme/discovery.conf`
+  template file.
 
 ### New: ownership registry and exclusion list
 
-* A new ownership registry (`nvme registry`, backed by
-  `/run/nvme/registry/`) records which orchestrator -- a daemon like
-  nvme-stas or nvme-discoverd, or a manual connect -- owns each
-  connected controller. This is what lets `disconnect-all` (above)
-  and future orchestrator tooling avoid tearing down a connection
-  another component depends on. See `libnvme/design/REGISTRY.md`.
+* Added an ownership registry (`nvme registry`, backed by
+  `/run/nvme/registry/`) to track orchestrator and process ownership of
+  connected controllers, preventing accidental teardowns by competing
+  services.
 
-* A new system-wide exclusion list (`nvme exclusion`, backed by
-  `/etc/nvme/exclusions.conf` and `exclusions.conf.d/` drop-ins)
-  lets an administrator block specific controllers -- by transport,
-  address, or NQN -- from being auto-connected. It's aimed
-  primarily at auto-discovered controllers, which have no config
-  entry to remove in order to suppress an unwanted connection. See
-  `libnvme/design/EXCLUSIONS.md`.
+* Added a system-wide exclusion list (`nvme exclusion`, backed by
+  `/etc/nvme/exclusions.conf` and `exclusions.conf.d/` drop-ins) allowing
+  administrators to block specific controllers by transport, address, or
+  NQN from auto-connecting.
+
+### New: Windows support
+
+* Added Windows (MSYS2/UCRT64) build and execution support for `nvme-cli`,
+  `libnvme`, and most vendor plugins (excluding fabrics support).
 
 ### nvme-cli
 
-* `nvme connect` gained `--idempotent` and `--devid-file`.
-  `--idempotent` makes connecting to an already-connected controller
-  succeed instead of erroring. `--devid-file` writes the resulting
-  `nvmeX` device name to the given file on success, so a caller that
-  doesn't know the device name at connect time (for example, a
-  systemd unit spawned before the device exists) can look it up
-  afterward instead of scraping `dmesg` or polling sysfs.
+* Added `--idempotent` and `--devid-file` flags to `nvme connect`.
+  `--idempotent` allows connections to existing controllers without
+  throwing an error, while `--devid-file` outputs the assigned `nvmeX`
+  device name upon success.
+
+* Updated `nvme disconnect` to accept full connection-matching parameters
+  (transport, address, NQN) consistent with `nvme connect`.
+
+* Introduced `nvme top`, an interactive dashboard for real-time monitoring
+  of NVMe subsystems, paths, multipath distribution, and diagnostic
+  counters.
+
+* Added `nvme utils dump-command-metadata` to export the live command tree
+  and options in JSON format.
 
 ### libnvme
 
-* A new INI-format connection configuration parser and writer have
-  been added (`nvme-fabrics.conf` + `nvme-fabrics.conf.d/` drop-ins,
-  intended to eventually replace `config.json`/`discovery.conf`).
-  Not yet used by `nvme connect-all`/`nvme discover` -- that
-  integration is still in progress. See `libnvme/design/CONFIG.md`
-  for the format.
+* Introduced an INI-format configuration parser (`nvme-fabrics.conf` +
+  drop-ins) replacing legacy JSON/discovery connection formats.
 
-* Read-only Python bindings for the new config format
-  (`config_read()`, `config_validate()`) are available now for early
-  adopters (e.g. nvme-stas) that want to start reading the new
-  format ahead of the CLI's own switch-over.
+* Refactored fabrics protocol logic out of `nvme-cli` and into `libnvme` to
+  streamline implementation across external consumers.
 
-* The accessor generator that produces libnvme's getter/setter
-  boilerplate (`accessors.c`/`.h`) has been rewritten in Python,
-  with the struct annotations it reads now living in-source in
-  `private.h` instead of a separate spec file. Relevant to
-  developers extending libnvme's public structs, not to CLI end
-  users.
+* Unified 32-bit and 64-bit passthru command structures and functions into
+  a single 64-bit layout (`struct nvme_passthru_cmd`).
+
+* Added read-only Python bindings for parsing and validating the new INI
+  configuration format.
+
+* Reworked SWIG Python bindings and modernized internal accessor generation
+  tools.
+
+* Merged `libnvme-mi` into `libnvme` and renamed the unified package to
+  **libnvme3** (`libnvme3.so.1`), with headers installed under
+  `include/libnvme3/`.
+
+* Split `<nvme/nvme-cmds.h>` and `<nvme/nvme-types.h>` into domain-specific
+  sub-headers (e.g., base, fabrics, MI). The top-level headers remain
+  intact for backward compatibility.
+
+* Replaced `nvme_root_t` with `struct libnvme_global_ctx *` across the
+  public API.
+
+* Updated `libnvme_create_global_ctx()` to require explicit
+  post-construction setter calls for logging configuration.
+
+* Introduced `struct nvme_transport_handle` to abstract command execution
+  across direct `ioctl` file descriptors and MI endpoints.
+
+* Added dedicated asynchronous passthru APIs (`libnvme_submit_*`,
+  `libnvme_wait_*`, `libnvme_reap_*`) alongside synchronous execution
+  interfaces. Depends on io_uring support.
+
+* Decoupled passthru command construction (`nvme_init_*`) from command
+  submission (`libnvme_exec_*` / `libnvme_submit_*`).
+
+* Added real-time, non-cached diagnostic counter accessors for sysfs
+  statistics across controllers, namespaces, and paths.
+
+* Promoted `libnvmf_host_get_ids()` to a public API for resolving host
+  identity prior to connection setup.
+
+* Removed implicit host identity lookups from fabrics connection routines.
+  Callers must resolve or set `hostnqn` and `hostid` explicitly.
+
+* Refactored internal fabrics routing through a context hook structure to
+  allow custom caller policies.
+
+* Updated `libnvmf_read_hostnqn()` and `libnvmf_read_hostid()` to require a
+  `struct libnvme_global_ctx *` parameter.
+
+* Added global context setters (`libnvme_global_ctx_set_hostnqn()`,
+  `libnvme_global_ctx_set_hostid()`) to define fallback host identity defaults.
+
+* Removed legacy `sizeof_args` compatibility macros and struct-based
+  command shims.
+
+* Removed platform-specific filter helpers (`nvme_filter_*`) from the
+  public API in favor of `libnvme_scan_*` interfaces.
+
+* Removed unused internal functions `libnvme_ctrl_match_config()` and
+  `libnvmf_ctrl_get_fabrics_config()`.
+
+* Removed `nvme_mi_ctrl_t` and MI-specific identify helpers in favor of the
+  unified `struct nvme_transport_handle` interface.
+
+* Removed legacy definitions, deprecated status code aliases, and telemetry
+  function names.
+
+* Removed environment variable configuration flags (`LIBNVME_*`) in favor
+  of explicit context setter API calls.
 
 > Open question, not yet decided: whether to also generate a
 > mechanically-produced contributor list per release (roughly `git
 > shortlog -sn <previous-tag>..HEAD`), the way systemd's own
 > announcement emails do. Cheap to produce, credits everyone who
 > touched the release.
-
-## Older changes
-
-Not backfilled. See the git log and GitHub release/tag history for
-anything before this file existed.
