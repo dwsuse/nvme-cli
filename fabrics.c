@@ -142,14 +142,36 @@ void nvmf_args_to_params(struct libnvmf_params *params,
 				   fa->tls_key_identity);
 }
 
+/*
+ * A single "discover"/"connect-all" invocation may hit this more than once
+ * (multiple discovery.conf entries, nbft + config, referrals, ...). Rather
+ * than clobber the previous log on every write, the first write of the run
+ * takes the plain filename and every later write gets a ".N" suffix so all
+ * of them survive.
+ */
 static void save_discovery_log(char *raw, struct nvmf_discovery_log *log)
 {
+	static unsigned int save_count;
+	__cleanup_free char *path = NULL;
 	uint64_t numrec = le64_to_cpu(log->numrec);
 	int fd, len, ret;
 
-	fd = open(raw, O_CREAT | O_RDWR | O_TRUNC, 0600);
+	if (save_count) {
+		if (asprintf(&path, "%s.%u", raw, save_count) < 0) {
+			nvme_show_error("failed to allocate path for %s", raw);
+			return;
+		}
+	} else {
+		path = strdup(raw);
+		if (!path) {
+			nvme_show_error("failed to allocate path for %s", raw);
+			return;
+		}
+	}
+
+	fd = open(path, O_CREAT | O_RDWR | O_TRUNC, 0600);
 	if (fd < 0) {
-		nvme_show_error("failed to open %s: %s", raw, libnvme_strerror(errno));
+		nvme_show_error("failed to open %s: %s", path, libnvme_strerror(errno));
 		return;
 	}
 
@@ -158,11 +180,13 @@ static void save_discovery_log(char *raw, struct nvmf_discovery_log *log)
 	ret = write(fd, log, len);
 	if (ret < 0)
 		nvme_show_error("failed to write to %s: %s",
-			raw, libnvme_strerror(errno));
+			path, libnvme_strerror(errno));
 	else
-		nvme_show_verbose_info("Discovery log is saved to %s", raw);
+		nvme_show_verbose_info("Discovery log is saved to %s", path);
 
 	close(fd);
+
+	save_count++;
 }
 
 static int setup_common_context(struct libnvmf_context *fctx,
